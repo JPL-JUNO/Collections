@@ -22,7 +22,7 @@ from method.temp.var_stat import vb_code
 
 class DataMining(Derive, StandardScaler):
     def __init__(self, data: DataFrame, label: str = 'label'):
-        self.step = 0
+        self.step = 1
         self.data = data
         self.label = label
 
@@ -50,23 +50,53 @@ class DataMining(Derive, StandardScaler):
                 'Label {0:^4} has {1:>8} samples {2:2.2%}.'.format(k, v, v / self.m))
         print('')
 
-    def _print_step(self, info: str):
+    def renew(self, pnt: bool = True, desc: bool = True) -> None:
+        if desc:
+            old_shape = self.shape
+        self.columns = self.data.columns
+        self.shape = self.data.shape
+        self.m, self.n = self.data.shape
+
+        if desc:
+            delta_col = self.n - old_shape[1]
+            delta_row = self.m - old_shape[0]
+            if delta_col < 0:
+                info_col, delta_col = '特征数减少', -delta_col
+            elif delta_col > 0:
+                info_col, delta_col = '特征数增加', delta_col
+            else:
+                info_col, delta_col = '特征数未变', ''
+
+            if delta_row < 0:
+                info_row, delta_row = '样本数减少', -delta_row
+            elif delta_col > 0:
+                info_row, delta_row = '样本数增加', delta_row
+            else:
+                info_row, delta_row = '样本数未变', ''
+            self._print('{0:<6}{1} {2:<6}{3}'.format(
+                info_col, delta_col, info_row, delta_row))
+        if pnt:
+            self._print(
+                '数据更新：\n最新样本数为{0:,} 最新特征数为{1:,}'.format(self.m, self.n))
+            print('')
+
+    def _print_step(self, info: str) -> None:
         s = inspect.stack()[1][3]
         print('Step {} {} {}...'.format(self.step, info, s))
         self.step += 1
 
-    def _print(self, p: str):
+    def _print(self, p: str) -> None:
         if self.print_lvl > 3:
             print(p)
 
-    def check_dtypes(self):
+    def check_dtypes(self) -> None:
         self._print_step('检查特征类型')
         for k, v in Counter(self.data.dtypes).items():
             self._print(
                 'Data type {0} has {1} feature(s) proportion {2:2.2%}'.format(k, v, v / self.n))
         print('')
 
-    def check_uni_char(self, uni):
+    def check_uni_char(self, uni) -> None:
         self._print_step('清理异常字符')
         # 获取object的字段名
         # cols = pd.DataFrame(self.data.dtypes)
@@ -107,7 +137,7 @@ class DataMining(Derive, StandardScaler):
         self.na_summary = check_mv
 
         if print_result:
-            self._print(' 特征缺失率：')
+            self._print('特征缺失率：')
             self._print(self.na_summary)
             print('')
 
@@ -131,6 +161,70 @@ class DataMining(Derive, StandardScaler):
     def filter_blank_values(self) -> None:
         self._print_step('填充空白字符串')
         self.data = self.data.replace(r'^\s*$', np.nan, regex=True)
+        print('')
 
-    def fill_missing_values(self, fill, print_step: bool = True) -> None:
-        pass
+    def fill_missing_values(self, mapping: dict, print_step: bool = True) -> None:
+        self._print_step('填充缺失数据')
+        for k, v in mapping.items():
+            na_num = self.data[k].isnull().sum()
+            self.data[k] = self.data[k].fillna(v)
+            if print_step:
+                self._print('特征{0}填充{1:>6}个缺失值{2:>4}'.format(k, na_num, v))
+        print('')
+
+    def filter_data_subtable(self, frac=None,
+                             balance: bool = True,
+                             oversampling: bool = False,
+                             label: str = 'label', random_state=42) -> None:
+        self._print_step('不平衡样本重构')
+        a = Counter(self.data[self.label])
+        k_more, v_more = a.most_common(2)[0]
+        k_less, v_less = a.most_common(2)[1]
+        if balance:
+            if oversampling:  # 上采样
+                self.data = pd.concat(
+                    [self.data.loc[self.data[label] == k_more],
+                     self.data.loc[self.data[label] == k_less].sample(
+                        frac=v_more / v_less, random_state=random_state, replace=True).sort_index()
+                     ], ignore_index=True
+                )
+            else:
+                self.data = pd.concat(
+                    # 无放回抽样
+                    [self.data.loc[self.data[label] == k_more].sample(
+                        frac=v_less / v_more, random_state=random_state, replace=True).sort_index(),
+                     self.data.loc[self.data[label] == k_less]
+                     ], ignore_index=True
+                )
+                self.renew()
+                self.check_y_dist()
+        else:
+            # 如果frac不是整数或者小数，抛出错误
+            assert isinstance(frac, (float, int)), 'frac not right determined.'
+            self.data = pd.concat(
+                [self.data.loc[self.data[label] == k_more].sample(
+                    frac=frac, random_state=random_state).sort_index(),
+                 self.data.loc[self.data[label] == k_less]
+                 ], ignore_index=True
+            )
+            self.renew()
+            self.check_y_dist()
+
+    def data_describe(self) -> DataFrame:
+        self._print('更新特征描述')
+        epo = pd.DataFrame(index=list(self.columns))
+        epo['dtypes'] = self.data.dtypes[epo.index]
+        epo['vb_name'] = [self.vb_code[i]
+                          if i in self.vb_code.keys() else '-' for i in epo.index]
+        epo['total'] = self.m
+        epo['identical_value'] = [
+            self.data[col].value_counts(normalize=True).max() for col in epo.index]
+        epo = pd.merge(epo, self.data.describe(percentiles=[.05, .25, .75, .95]).T,
+                       how='left', left_index=True, right_index=True)
+        epo.drop(['count'], axis=1, inplace=True)
+        epo = epo.rename(columns={'total': 'count'})
+        order = ['dtypes', 'vb_name', 'count', 'mean', 'std', 'min',
+                 '5%', '25%', '50%', '75%', '95%', 'max', 'identical_value']
+        epo = epo[order]
+        self.epo = epo
+        return self.epo

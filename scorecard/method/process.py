@@ -25,22 +25,50 @@ class ScoreCardProcess(DataMining):
                               list), 'Specified columns should be in a list'
             self.data = self.data = self.data[[
                 self.label] + self.use_specified_col]
+            self.renew()
         # target的分类统计结果并打印
         self.check_y_dist()
 
         # 检查数据类型
         self.check_dtypes()
+
         # 异常字符串处理
         if cek_uni_char is not None:
             for i in cek_uni_char:
                 self.check_uni_char(i)
 
         if fillna is not None:
-            self.filter_missing_values(fillna)
-
+            self.fill_missing_values(mapping=fillna)
+        # 移除异常值
         if abnor is not None:
             self.filter_abnor_values(abnor)
 
         if remove_blank:
             self.filter_blank_values()
+        # 缺失值检查
         self.check_missing_value(print_result=True)
+        # 样本平衡
+        if resample:
+            self.filter_data_subtable(
+                label=self.label, balance=True, oversampling=oversampling)
+        # 最终的样本描述
+        self.check_y_dist()
+
+        self.epo = self.data_describe()
+
+    def pro_feature_filter(self, inplace_data: bool = True,
+                           var_zip=None,
+                           plot_zip: bool = False,
+                           iv_limit: float = .02,
+                           missing_limit: float = .95,
+                           identical_limit: float = .95,
+                           var_rm: list = None,
+                           var_kp: list = None,
+                           positive: str = 'good|1'):
+        if var_zip is None:
+            var_zip = dict()
+            numerical_col = self.data.drop(
+                self.label, axis=1).select_dtypes(include=['int', 'float'])
+            var_zip = {col: None for col in numerical_col}
+        if var_kp is None:
+            var_kp = list()
