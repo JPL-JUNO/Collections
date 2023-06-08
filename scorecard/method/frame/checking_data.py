@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from method.frame.features_derive import Derive
 from method.frame.standard_scaler import StandardScaler
+from method.frame.util import feature_zip
 from method.temp.var_stat import vb_code
 
 
@@ -228,3 +229,39 @@ class DataMining(Derive, StandardScaler):
         epo = epo[order]
         self.epo = epo
         return self.epo
+
+    def check_feature_zip(self, var: dict, c: float = .3, if0: bool = False, plot: bool = False) -> None:
+        self._print_step('连续特征压缩')
+
+        # 目标特征存在于 self.data 的字段中
+        self.__k_in = list(set(var.keys()).intersection(self.columns))
+        # 不存在数据字段中的目标特征
+        self.__k_out = list(set(var.keys()).difference(set(self.__k_in)))
+        # 备份传入特征的数据以及target
+        self.__date_feature_zip_backup = self.data[self.__k_in + [
+            self.label]].copy(deep=True)
+        for k in self.__k_in:
+            feature_zip(self.__date_feature_zip_backup, var=k, c=c,
+                        e=var[k], if0=if0, inplace=True, label=self.label, plot=plot)
+        for k in self.__k_out:
+            self._print('特征{0}不存在...'.format(k))
+        pass
+
+    def copy_filter_feature_zip(self) -> None:
+        self._print_step('压缩特征-测试数据')
+        self.test_data = self.data.copy(deep=True)
+        self.test_data.drop(self.__k_in, axis=1, inplace=True)
+        self.__date_feature_zip_backup.drop(self.label, axis=1, inplace=True)
+        self.test_data = pd.concat(
+            [self.test_date, self.__date_feature_zip_backup], axis=1)
+        self.renew()
+
+    def sample_var_filter(self, dt: DataFrame, x=None,
+                          iv_limit: float = .02, missing_limit: float = .95, identical_limit: float = .95,
+                          var_rm: list | None = None, var_kp: list | None = None,
+                          return_rm_reason: bool = True, positive: bool = True) -> Series:
+        self._print_step('特征过滤')
+        tem = var_filter()
+        if return_rm_reason:
+            self.rm_reason = tem['rm']
+        return tem['dt']

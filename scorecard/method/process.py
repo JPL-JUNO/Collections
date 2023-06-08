@@ -66,9 +66,22 @@ class ScoreCardProcess(DataMining):
                            var_kp: list = None,
                            positive: str = 'good|1'):
         if var_zip is None:
-            var_zip = dict()
-            numerical_col = self.data.drop(
-                self.label, axis=1).select_dtypes(include=['int', 'float'])
+            numerical_col = self.data.drop(self.label, axis=1).select_dtypes(
+                include=['int', 'float']).columns
             var_zip = {col: None for col in numerical_col}
         if var_kp is None:
             var_kp = list()
+        var_kp2 = list() if self.use_specified_col is None else self.use_specified_col
+        self.check_feature_zip(var_zip, c=.3, if0=False, plot=plot_zip)
+
+        # 创建 test_data
+        self.copy_filter_feature_zip()
+
+        self.test_data = self.sample_var_filter(dt=self.test_data,
+                                                x=None,
+                                                iv_limit=iv_limit,
+                                                missing_limit=missing_limit,
+                                                identical_limit=identical_limit, var_rm=var_rm,
+                                                var_kp=list(
+                                                    set(var_kp + var_kp2)),
+                                                return_rm_reason=True, positive=positive)
