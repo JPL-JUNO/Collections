@@ -90,3 +90,37 @@ def check_y(data, y: str, positive):
     # unique_y = np.unique(data[y].values)
     unique_y = set(data[y].values)
     assert len(unique_y) == 2, '预测变量不符合二分类'
+
+
+def x_variable(data: DataFrame, y: str,
+               x: list | tuple,
+               var_skip: str = None) -> list | tuple:
+    """determine feature columns remained
+
+    Args:
+        data (DataFrame): data
+        y (str): target
+        x (list | tuple): columns specified, must be in list or tuple
+        var_skip (str, optional): some column remove manually. Defaults to None.
+
+    Returns:
+        list | tuple: columns
+    """
+    y = str_to_list(y)
+    if var_skip is not None:
+        y = y + str_to_list(var_skip)
+    col_all = list(set(data.columns).difference(set(y)))
+    if x is None:
+        # 如果没有指定变量，则数据中的字段名即为变量
+        x = col_all
+    else:
+        # 如果手动指定了便令，则判断指定的变量是否与数据中字段存在交集，存在则为交集，
+        # 没有交集则为数据中的字段
+        assert isinstance(
+            x, (list, tuple)), '手动指定的字段格式不正确，必须是列表(list)或者元组(tuple)'
+        x_inter = set(x).intersection(set(col_all))
+        x_except = set(x).difference(set(col_all))
+        if len(x_except) > 0:
+            warnings.warn('{0}个指定变量被移除:\n{1}'.format(len(x_except), x_except))
+        x = x_inter if x_inter else col_all
+    return x

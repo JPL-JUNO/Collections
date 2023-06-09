@@ -19,6 +19,7 @@ from method.frame.features_derive import Derive
 from method.frame.standard_scaler import StandardScaler
 from method.frame.util import feature_zip
 from method.temp.var_stat import vb_code
+from method.frame.variable_selection import var_filter
 
 
 class DataMining(Derive, StandardScaler):
@@ -253,7 +254,7 @@ class DataMining(Derive, StandardScaler):
         self.test_data.drop(self.__k_in, axis=1, inplace=True)
         self.__date_feature_zip_backup.drop(self.label, axis=1, inplace=True)
         self.test_data = pd.concat(
-            [self.test_date, self.__date_feature_zip_backup], axis=1)
+            [self.test_data, self.__date_feature_zip_backup], axis=1)
         self.renew()
 
     def sample_var_filter(self, dt: DataFrame, x=None,
@@ -261,7 +262,11 @@ class DataMining(Derive, StandardScaler):
                           var_rm: list | None = None, var_kp: list | None = None,
                           return_rm_reason: bool = True, positive: bool = True) -> Series:
         self._print_step('特征过滤')
-        tem = var_filter()
+        tem = var_filter(data=dt, y=self.label, x=x,
+                         iv_limit=iv_limit, missing_limit=missing_limit,
+                         var_rm=var_rm, var_kp=var_kp,
+                         return_rm_reason=return_rm_reason,
+                         positive=positive)
         if return_rm_reason:
             self.rm_reason = tem['rm']
         return tem['dt']

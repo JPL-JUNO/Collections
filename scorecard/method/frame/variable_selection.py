@@ -5,8 +5,10 @@
 @CreatedTime: 2023-06-08 15:24:09
 """
 import timeit
+import warnings
 from pandas import DataFrame
-from method.frame.util import check_y
+from method.frame.util import check_y, x_variable
+from method.frame.info_value import information_value
 
 
 def var_filter(dt: DataFrame, y: str, x=None,
@@ -38,7 +40,20 @@ def var_filter(dt: DataFrame, y: str, x=None,
     # 检验输入数据的合理性，（仅适用于二分类样本）
     df = check_y(df, y, positive)
 
-    pass
+    x = x_variable(df, y, x)
+
+    if var_rm is not None:
+        if isinstance(var_rm, str):  # 如果传入的强制删除变量为字符串，则转化为列表
+            var_rm = [var_rm]
+        x = list(set(x).difference(set(var_rm)))  # 将被删除的变量（字段）中特征列表 x 中移除
+    if var_kp is not None:
+        if isinstance(var_kp, str):
+            var_kp = [var_kp]
+        var_kp2 = list(set(x).intersection(set(var_kp)))
+        if set(var_kp).difference(set(var_kp2)):
+            warnings.warn('存在{0:4}无效的保留字段，因为数据中不存在：\n'.format(
+                len(set(var_kp).difference(set(var_kp2))), list(set(var_kp).difference(set(var_kp2)))))
+    iv_list = information_value(df, y, x, order=False)
 
 
 if __name__ == '__main__':
