@@ -262,11 +262,11 @@ class DataMining(Derive, StandardScaler):
                           var_rm: list | None = None, var_kp: list | None = None,
                           return_rm_reason: bool = True, positive: bool = True) -> Series:
         self._print_step('特征过滤')
-        tem = var_filter(data=dt, y=self.label, x=x,
+        res = var_filter(data=dt, y=self.label, x=x,
                          iv_limit=iv_limit, missing_limit=missing_limit,
                          var_rm=var_rm, var_kp=var_kp,
                          return_rm_reason=return_rm_reason,
                          positive=positive)
         if return_rm_reason:
-            self.rm_reason = tem['rm']
-        return tem['dt']
+            self.rm_reason = res['rm']
+        return res['data']
