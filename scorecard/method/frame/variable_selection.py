@@ -55,7 +55,7 @@ def var_filter(dt: DataFrame, y: str, x=None,
         if set(var_kp).difference(set(var_kp2)):
             warnings.warn('存在{0:4}无效的保留字段，因为数据中不存在：\n'.format(
                 len(set(var_kp).difference(set(var_kp2))), list(set(var_kp).difference(set(var_kp2)))))
-    iv_ser = information_value(df, y, x, order=False)
+    iv_ser = information_value(df, y, x, desc=False)
 
     # def nan_rate(a): return a[a.isnull()].size / a.size
     # na_pct = df[x].apply(nan_rate).reset_index(
@@ -72,7 +72,7 @@ def var_filter(dt: DataFrame, y: str, x=None,
     x_selected = df_indicator[mask].index.tolist()
     if var_kp is not None:
         x_selected = list(set(x_selected + var_kp))
-    df_selected = df[x_selected + y]
+    df_selected = df[x_selected + [y]]
     running_time = timeit.default_timer() - start_time
     if (running_time > 10):
         print(
@@ -81,7 +81,7 @@ def var_filter(dt: DataFrame, y: str, x=None,
             dt.shape[0], dt.shape[1]))
 
     if return_rm_reason:
-        x_threshold = df_indicator.assign(
+        x_remove_reason = df_indicator.assign(
             info_value=lambda x: [
                 f'info value <{iv_limit}' if i else np.nan for i in (x[2] < iv_limit)],
             missing_rate=lambda x: [
@@ -91,11 +91,11 @@ def var_filter(dt: DataFrame, y: str, x=None,
         )
         if var_rm is not None:
             x_remove_reason = pd.concat(
-                [x_threshold, pd.Series(data=['force remove'] * len(var_rm), index=var_rm)], axis=1)
+                [x_remove_reason, pd.Series(data=['force remove'] * len(var_rm), index=var_rm)], axis=1)
         if var_kp is not None:
             x_remove_reason = pd.concat(
-                [x_remove_reason, pd.Series(data=[np.nan] * len(var_kp), index=var_kp)], axis=1)
-        x_remove_reason = x_threshold.dropna(how='all')
+                [x_remove_reason, pd.Series(data=[np.nan] * len(var_kp), index=var_kp, dtype='object')], axis=1)
+        x_remove_reason = x_remove_reason.dropna(how='all')
         return {'data': df_selected, 'rm': x_remove_reason}
     else:
         return {'data': df_selected}

@@ -6,7 +6,7 @@
 """
 
 import pandas as pd
-import numbers as np
+import numpy as np
 from method.frame.util import check_y, x_variable
 from pandas import DataFrame, Series
 
@@ -37,7 +37,9 @@ def information_value(df: DataFrame, y: str, x: list | None = None,
     #     'variable': cols,
     #     'IV': [iv_calc(df[xi], df[y[0]]) for xi in cols]
     # }).set_index('variable')
-    iv_ser = df[x].apply(lambda col: iv_calc(df[col], df[y[0]]))
+    iv = [iv_calc(df[col], df[y]) for col in cols]
+    iv_ser = pd.Series(data=iv, index=cols)
+    # iv_ser = df[cols].apply(lambda col: iv_calc(df[col], df[y[0]]))
 
     if desc is not None:
         if desc:
@@ -49,8 +51,8 @@ def information_value(df: DataFrame, y: str, x: list | None = None,
 
 def iv_calc(X: Series, y: Series) -> float:
     def neg_pos(df: DataFrame):
-        cnt = {'neg': (df['label'] == 0).sum(),
-               'pos': (df['label'] == 1).sum()}
+        cnt = {'neg': (df['y'] == 0).sum(),
+               'pos': (df['y'] == 1).sum()}
         return pd.Series(cnt)
 
     df_immd = pd.DataFrame({'X': X.astype(str),

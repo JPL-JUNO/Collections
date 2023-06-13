@@ -75,7 +75,7 @@ def str_to_list(x: str | None):
     return x
 
 
-def check_y(data, y: str, positive):
+def check_y(data, y: str, positive) -> DataFrame:
     positive = str(positive)
     assert isinstance(data, DataFrame), '数据类型需要为pd.DataFrame'
     assert data.shape[1] > 2, '数据的变量数必须大于2'
@@ -90,6 +90,19 @@ def check_y(data, y: str, positive):
     # unique_y = np.unique(data[y].values)
     unique_y = set(data[y].values)
     assert len(unique_y) == 2, '预测变量不符合二分类'
+
+    if any([re.search(positive, str(v)) for v in unique_y]):
+        y1 = data[y]
+        y2 = data[y].apply(lambda x: 1 if str(
+            x) in re.split('\|', positive) else 0)
+        if (y1 != y2).any():
+            data[y] = y2
+            # data[data.columns[y]] = y2
+            warnings.warn(
+                '默认修改 positive value \{}\ 为 1, negative value 为 0 '.format(y))
+    else:
+        raise ValueError('positive value 未被正确声明')
+    return data
 
 
 def x_variable(data: DataFrame, y: str,
@@ -124,3 +137,13 @@ def x_variable(data: DataFrame, y: str,
             warnings.warn('{0}个指定变量被移除:\n{1}'.format(len(x_except), x_except))
         x = x_inter if x_inter else col_all
     return x
+
+
+def check_unique_value_prop(df: DataFrame, p: float = .95) -> dict:
+    assert p <= 1, '指定的占比占比需要小于1(100%)'
+    assert isinstance(df, DataFrame), '指定的数据集需要是DataFrame'
+    mask = [df[col].value_counts().max() / df.shape[0] < p
+            for col in df.columns]
+    inv_mask = [False if x else True for x in mask]
+    removed_columns = df.columns[mask].to_list()
+    return {'reserved_data': df.loc[:, mask], 'removed_columns': removed_columns}

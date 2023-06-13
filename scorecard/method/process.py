@@ -22,8 +22,8 @@ class ScoreCardProcess(DataMining):
         # 使用指定特征建模
         if self.use_specified_col is not None:
             assert isinstance(self.use_specified_col,
-                              list), 'Specified columns should be in a list'
-            self.data = self.data = self.data[[
+                              list), 'Specified columns must be in a list'
+            self.data = self.data[[
                 self.label] + self.use_specified_col]
             self.renew()
         # target的分类统计结果并打印
@@ -85,3 +85,26 @@ class ScoreCardProcess(DataMining):
                                                 var_kp=list(
                                                     set(var_kp + var_kp2)),
                                                 return_rm_reason=True, positive=positive)
+        if inplace_data:
+            self.data = self.data[self.test_data.columns.tolist()]
+            self.renew()
+        self.epo = self.data_describe()
+
+    def feature_process(self, iv_threshold: float = .15,
+                        max_features: int = 6,
+                        corr_threshold: float = .6,
+                        cum_importance: float = .95,
+                        breaks_adj=None, var_remove: list | None = None,
+                        var_keep: list | None = None) -> None:
+        if var_keep is not None:
+            assert isinstance(var_keep, list), 'var_keep must be a list'
+        if var_remove is not None:
+            assert isinstance(var_remove, list), 'var_remove must be a list'
+        if self.use_specified_col is not None:
+            assert isinstance(self.use_specified_col,
+                              list), 'use_specified_col must be a list'
+            print('使用指定特征建模...')
+            self.data = self.data[[self.label] + self.use_specified_col]
+            self.renew()
+        else:
+            self.bin0 = self.sample_woe_bin()

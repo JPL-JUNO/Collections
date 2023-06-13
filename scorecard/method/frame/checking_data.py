@@ -19,6 +19,7 @@ from method.frame.features_derive import Derive
 from method.frame.standard_scaler import StandardScaler
 from method.frame.util import feature_zip
 from method.temp.var_stat import vb_code
+from method.frame.woe_bin import woe_bin
 from method.frame.variable_selection import var_filter
 
 
@@ -71,7 +72,7 @@ class DataMining(Derive, StandardScaler):
 
             if delta_row < 0:
                 info_row, delta_row = '样本数减少', -delta_row
-            elif delta_col > 0:
+            elif delta_row > 0:
                 info_row, delta_row = '样本数增加', delta_row
             else:
                 info_row, delta_row = '样本数未变', ''
@@ -239,10 +240,10 @@ class DataMining(Derive, StandardScaler):
         # 不存在数据字段中的目标特征
         self.__k_out = list(set(var.keys()).difference(set(self.__k_in)))
         # 备份传入特征的数据以及target
-        self.__date_feature_zip_backup = self.data[self.__k_in + [
+        self.__data_feature_zip_backup = self.data[self.__k_in + [
             self.label]].copy(deep=True)
         for k in self.__k_in:
-            feature_zip(self.__date_feature_zip_backup, var=k, c=c,
+            feature_zip(self.__data_feature_zip_backup, var=k, c=c,
                         e=var[k], if0=if0, inplace=True, label=self.label, plot=plot)
         for k in self.__k_out:
             self._print('特征{0}不存在...'.format(k))
@@ -252,9 +253,9 @@ class DataMining(Derive, StandardScaler):
         self._print_step('压缩特征-测试数据')
         self.test_data = self.data.copy(deep=True)
         self.test_data.drop(self.__k_in, axis=1, inplace=True)
-        self.__date_feature_zip_backup.drop(self.label, axis=1, inplace=True)
+        self.__data_feature_zip_backup.drop(self.label, axis=1, inplace=True)
         self.test_data = pd.concat(
-            [self.test_data, self.__date_feature_zip_backup], axis=1)
+            [self.test_data, self.__data_feature_zip_backup], axis=1)
         self.renew()
 
     def sample_var_filter(self, dt: DataFrame, x=None,
@@ -262,11 +263,17 @@ class DataMining(Derive, StandardScaler):
                           var_rm: list | None = None, var_kp: list | None = None,
                           return_rm_reason: bool = True, positive: bool = True) -> Series:
         self._print_step('特征过滤')
-        res = var_filter(data=dt, y=self.label, x=x,
+        res = var_filter(dt=dt, y=self.label, x=x,
                          iv_limit=iv_limit, missing_limit=missing_limit,
+                         identical_limit=identical_limit,
                          var_rm=var_rm, var_kp=var_kp,
                          return_rm_reason=return_rm_reason,
                          positive=positive)
         if return_rm_reason:
             self.rm_reason = res['rm']
         return res['data']
+
+    def sample_woe_bin(self):
+        self._print_step('特征分箱')
+        bins = woe_bin()
+        pass
