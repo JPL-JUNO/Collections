@@ -13,3 +13,4 @@ class DataLoader:
 
     def read_data(self):
         self.data = pd.read_csv(self.path, encoding='utf-8')
+        return self.data

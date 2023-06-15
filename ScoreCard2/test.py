@@ -7,9 +7,10 @@
 import os
 os.chdir('C:/Notes/Collections/ScoreCard2')
 from sc_model import SCModel
-from data_loader import DataLoader
-dl = DataLoader('./iris.data')
-data = dl.read_data()
+# from data_loader import DataLoader
+# dl = DataLoader('./iris.data')
+# data = dl.read_data()
 
-model = SCModel(data, label='label')
+model = SCModel('iris', 'data', label='E')
+model.data_loader()
 model.data_view()
