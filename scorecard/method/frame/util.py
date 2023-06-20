@@ -14,6 +14,7 @@ import math
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pandas import DataFrame
+from typing import Dict
 
 
 def feature_zip(data: DataFrame, var: str, c: float = .3, if0: bool = False,
@@ -139,7 +140,7 @@ def x_variable(data: DataFrame, y: str,
     return x
 
 
-def check_unique_value_prop(df: DataFrame, p: float = .95) -> dict:
+def check_unique_value_prop(df: DataFrame, p: float = .95) -> Dict:
     assert p <= 1, '指定的占比占比需要小于1(100%)'
     assert isinstance(df, DataFrame), '指定的数据集需要是DataFrame'
     mask = [df[col].value_counts().max() / df.shape[0] < p
@@ -147,3 +148,47 @@ def check_unique_value_prop(df: DataFrame, p: float = .95) -> dict:
     inv_mask = [False if x else True for x in mask]
     removed_columns = df.columns[mask].to_list()
     return {'reserved_data': df.loc[:, mask], 'removed_columns': removed_columns}
+
+
+def remove_datetime_cols(df: DataFrame) -> DataFrame:
+    datetime_cols = df.apply(pd.to_numeric, errors='ignore').select_dtypes(include='object').apply(
+        pd.to_datetime, errors='ignore').select_dtypes(include='datetime64').columns.to_list()
+    if len(datetime_cols) > 0:
+        print(
+            f'[HINT] remove {len(datetime_cols)} column(s)\n {datetime_cols}')
+        return df.drop(datetime_cols, axis='columns')
+    else:
+        print(f'[PASS] datetime not found')
+        return df
+
+
+def rep_blank_na(df: DataFrame) -> DataFrame:
+    blank_cols = []
+    for col in df.columns:
+        if df[col].astype(str).str.findall(
+                r'^\s*$').apply(lambda x: 1 if len(x) > 0 else 0).sum():
+            blank_cols.append(col)
+    if len(blank_cols) > 0:
+        print(
+            f'[HINT] find space in {len(blank_cols)} column(s), replaced by NaN')
+        return df.replace(r'^\s*$', np.nan, regex=True)
+    else:
+        print(f'[PASS] blank not found')
+        return df
+
+
+def check_break_list(breaks: list, features: list):
+    if breaks is not None:
+        if isinstance(breaks, str):
+            breaks = eval(breaks)
+        if not isinstance(breaks, dict):
+            raise Exception('[Incorrect inputs]')
+    pass
+
+
+def dict_type_check(var, allow_none: bool = True):
+    if allow_none:
+        if var is not None:
+            assert isinstance(var, dict), '[Error] variable must be a dict'
+    else:
+        assert isinstance(var, dict), '[Error] variable must be a dict'
