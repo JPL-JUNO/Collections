@@ -99,8 +99,7 @@ def check_y(data, y: str, positive) -> DataFrame:
         if (y1 != y2).any():
             data[y] = y2
             # data[data.columns[y]] = y2
-            warnings.warn(
-                '默认修改 positive value \{}\ 为 1, negative value 为 0 '.format(y))
+            print(f'[Warning] 默认修改 positive value \ {y}\为1, negative value为0')
     else:
         raise ValueError('positive value 未被正确声明')
     return data
@@ -177,18 +176,40 @@ def rep_blank_na(df: DataFrame) -> DataFrame:
         return df
 
 
-def check_break_list(breaks: list, features: list):
-    if breaks is not None:
-        if isinstance(breaks, str):
-            breaks = eval(breaks)
-        if not isinstance(breaks, dict):
-            raise Exception('[Incorrect inputs]')
-    pass
+def dict_type_check(variable, allow_none: bool = True):
+    """check breaks type, should be a dict
 
+    Args:
+        breaks (None): breaks to check, dict or None by default
 
-def dict_type_check(var, allow_none: bool = True):
+    Returns:
+        None | dict: breaks whether a dict
+    """
     if allow_none:
-        if var is not None:
-            assert isinstance(var, dict), '[Error] variable must be a dict'
+        if variable is not None:
+            assert isinstance(
+                variable, dict), '[Error] variable must be a dict'
     else:
-        assert isinstance(var, dict), '[Error] variable must be a dict'
+        assert isinstance(variable, dict), '[Error] variable must be a dict'
+
+
+def check_print_step(print_step: int):
+    if not isinstance(print_step, int):
+        print(
+            f'[Warning] print_step should be an integer, got{print_step}, set to 1 by default')
+        print_step = 1
+    return print_step
+
+
+def check_special_values(special_values, features_to_deal):
+    if special_values is not None:
+        if isinstance(special_values, list):
+            sv_dict = {}
+            for var in features_to_deal:
+                sv_dict[var] = special_values
+            special_values = sv_dict
+        elif not isinstance(special_values, dict):
+            print(
+                f'[Error] special_values must be in list or dict, got {type(special_values)}')
+            assert False, '[Error]'
+    return special_values

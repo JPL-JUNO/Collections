@@ -273,7 +273,26 @@ class DataMining(Derive, StandardScaler):
             self.rm_reason = res['rm']
         return res['data']
 
-    def sample_woe_bin(self):
+    def sample_woe_bin(self, set_default_bin: bool = False, ret: bool = True,
+                       x=None, var_skip: list = None, breaks_dict: dict = None, special_values=None,
+                       stop_limit: float = .1, count_distr_limit: float = .05, bin_num_limit: int = 8,
+                       positive: str = 'bad|1', no_cores=None, print_step: int = 100, method: str = 'tree',
+                       ignore_const_cols=None, ignore_datetime_cols: bool = False, check_cate_num: bool = True,
+                       replace_black: bool = False, save_breaks_list: list = None, **kwargs
+                       ):
         self._print_step('特征分箱')
-        bins = woe_bin()
-        pass
+        bins = woe_bin(df=self.data, y=self.label, var_skip=var_skip,
+                       breaks=breaks_dict, special=special_values,
+                       stop_limit=stop_limit, count_distr_limit=count_distr_limit,
+                       bin_num_limit=bin_num_limit, positive=positive, no_cores=no_cores,
+                       print_step=print_step, method=method, ignore_const_cols=ignore_const_cols,
+                       ignore_datetime_cols=ignore_datetime_cols,
+                       check_cate_num=check_cate_num, replace_blank=replace_black, save_breaks_lst=save_breaks_list, **kwargs)
+        if set_default_bin:
+            if self.bins is not None:
+                self._print('覆盖原始分箱...\n')
+                self.bins = bins
+            else:
+                self.bins = bins
+        if ret:
+            return bins
