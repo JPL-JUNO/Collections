@@ -24,7 +24,9 @@ from method.frame.variable_selection import var_filter
 
 
 class DataMining(Derive, StandardScaler):
+
     def __init__(self, data: DataFrame, label: str = 'label'):
+
         self.step = 1
         self.data = data
         self.label = label
