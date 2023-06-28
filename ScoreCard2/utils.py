@@ -46,14 +46,13 @@ def calculate_information_value(data: DataFrame, label: str = 'label') -> float:
 
 
 def filter_by_iv(data, threshold: float = .02, label: str = 'label'):
-    cols = data.columns.to_list()
-    cols.remove(label)
+    cols_dict = dict.fromkeys(data.columns)
+    cols_dict.pop(label)
     col_removed = []
     col_reserved = []
-    iv_dict = {}
-    for col in cols:
+    for col in cols_dict:
         iv = calculate_information_value(data[[col, label]], label)
-        iv_dict[col] = iv
+        cols_dict[col] = iv
         if iv < threshold:
             col_removed.append(col)
         else:
