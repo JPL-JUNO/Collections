@@ -7,6 +7,7 @@
 from pandas import DataFrame
 import pandas as pd
 from collections import defaultdict
+from sklearn.metrics import mutual_info_score
 RISK_MIN = 1.1
 RISK_MAX = .9
 
@@ -20,7 +21,7 @@ def filter_by_risk(df: DataFrame, category: list[str], global_mean: float = .5,
     ----------
     df : DataFrame
         用于表示数据的数据框，需包含标签和特征
-    category : str
+    category : list[str]
         表示分类变量的字段，用于分组聚合
     global_mean : float, optional
         所有样本的平均水平，用于按照category分组后，判断组内target比例是否变化, by default .5
@@ -36,7 +37,7 @@ def filter_by_risk(df: DataFrame, category: list[str], global_mean: float = .5,
     """
     # 风险值的区间，如果全部分值落在这个区间，这个分类变量不应该保留，返回False
     keep_flg = defaultdict(bool)
-    for col in categorical:
+    for col in category:
         risk_iv = pd.Interval(left=risk_interval[0], right=risk_interval[1])
         df_group = df.groupby(by=col)[label].agg(['mean'])
         df_group['diff'] = df_group['mean'] - global_mean
@@ -45,20 +46,48 @@ def filter_by_risk(df: DataFrame, category: list[str], global_mean: float = .5,
     return keep_flg
 
 
-categorical = ['gender', 'seniorcitizen', 'partner', 'dependents',
-               'phoneservice', 'multiplelines', 'internetservice',
-               'onlinesecurity', 'onlinebackup', 'deviceprotection',
-               'techsupport', 'streamingtv', 'streamingmovies',
-               'contract', 'paperlessbilling', 'paymentmethod']
-numerical = ['tenure', 'monthlycharges', 'totalcharges']
+def filter_by_mi(df: DataFrame, category: list[str], threshold: float = .001,
+                 label: str = 'label') -> dict[bool]:
+    """使用互信息来过滤特征
 
-df = pd.DataFrame(data={'A': list('ababbbaa'),
-                        'B': [1, 2, 3, 3, 2, 2, 3, 1]})
-df = pd.read_csv('WA_Fn-UseC_-Telco-Customer-Churn.csv')
-df.columns = df.columns.str.lower().str.replace(' ', '_')
-df['churn'] = (df['churn'] == 'Yes').astype(int)
-df = df.dropna(axis=1)
+    Parameters
+    ----------
+    df : DataFrame
+        用于表示数据的数据框，需包含标签和特征
+    category : list[str]
+        待过滤的分类特征
+    threshold : float, optional
+        互信息最低的阈值, by default .001
+    label : str, optional
+        标记target的字段名, by default 'label'
+
+    Returns
+    -------
+    dict[bool]
+        `category`中每个字段保留`True`还是过滤掉`False`
+    """
+    def _calculate_mi(ser):
+        return mutual_info_score(ser, df[label])
+    df_mi = (df[category].apply(_calculate_mi) > threshold).to_dict()
+    return df_mi
 
 
-keep_flag = filter_by_risk(df, category=categorical,
-                           global_mean=0.2654, label='churn')
+if __name__ == '__main__':
+    categorical = ['gender', 'seniorcitizen', 'partner', 'dependents',
+                   'phoneservice', 'multiplelines', 'internetservice',
+                   'onlinesecurity', 'onlinebackup', 'deviceprotection',
+                   'techsupport', 'streamingtv', 'streamingmovies',
+                   'contract', 'paperlessbilling', 'paymentmethod']
+    numerical = ['tenure', 'monthlycharges', 'totalcharges']
+
+    df = pd.DataFrame(data={'A': list('ababbbaa'),
+                            'B': [1, 2, 3, 3, 2, 2, 3, 1]})
+    df = pd.read_csv('WA_Fn-UseC_-Telco-Customer-Churn.csv')
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    df['churn'] = (df['churn'] == 'Yes').astype(int)
+    df = df.dropna(axis=1)
+
+    keep_flag = filter_by_risk(df, category=categorical,
+                               global_mean=0.2654, label='churn')
+    keep_flag_mi = filter_by_mi(
+        df, category=categorical, threshold=.001, label='churn')
