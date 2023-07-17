@@ -126,36 +126,54 @@ def dsct_init(data, feature_cols, target: str = 'label'):
     return cnt
 
 
-def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int):
+def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int) -> float:
+    """计算两个组的卡方值
+
+    Parameters
+    ----------
+    cnt : DataFrame
+        已经按照不同取值统计target的数据框
+    bin1 : int
+        一组的索引值
+    bin2 : int
+        另一组的索引值，一般是`bin1 + 1`
+
+    Returns
+    -------
+    float
+        两组的卡方值
+    """
     # 计算出四联表
     # 因为最后一列是求和列，舍弃，只需要Aij
     Aij = cnt.iloc[[bin1, bin2], :-1].values
-    Ri = Aij.sum(axis=1)
-    Cj = Aij.sum(axis=0)
+    Ri = Aij.sum(axis=1).astype(float)
+    Cj = Aij.sum(axis=0).astype(float)
     Ri[Ri == 0] = .1
     Cj[Cj == 0] = .1
     Aij[Aij == 0] = .1
     N = Aij.sum()
-    Eij = Ri.reshape(-1, 1) * Cj
-    Cj = Aij.sum(axis=0)
-    Cj[Cj == 0] = .1
-
-    contingency_table = np.vstack((Aij, Cj))
-    Eij = contingency_table[:, -1].reshape(-1, 1) * \
-        contingency_table[-1, :].reshape(1, -1) / contingency_table[-1, -1]
-    chi2 = ((Aij[:, :-1] - Eij[:-1, :-1]) ** 2 / Eij[:-1, :-1]).sum()
-    print(chi2)
-    print(Eij)
-    print(Eij[:-1, :-1])
-    Eij = Aij[:, -1].reshape(-1, 1) * Cj[:-1] / Cj[-1]
-    print(Eij)
-    print(Aij[:, :-1])
-    chi2 = ((Aij[:, :-1] - Eij)**2 / Eij).sum()
-    print(chi2)
+    Eij = Ri.reshape(-1, 1) * Cj / N
+    chi2 = ((Aij - Eij) ** 2 / Eij).sum()
     return chi2
+
+
+def merge_adjacent_interval(chi2_list: list, cnt: DataFrame) -> DataFrame:
+
+    min_chi2 = min(chi2_list)
+    # 找到最小最的索引所在位置，如果有多个直接一次性合并，而不是每次只找到最靠前的索引(弃用，因为如果存在连续的idx不好处理)
+    min_idx = chi2_list.index(min(chi2_list))
+    # min_idx = [idx for idx in chi2_list if idx == min_chi2]
+    # for idx in min_idx:
+    #     cnt.iloc[idx] = cnt.iloc[idx] + cnt.iloc[idx + 1]
+    print(min_idx)
+    cnt.iloc[min_idx] = cnt.iloc[min_idx] + cnt.iloc[min_idx + 1]
+    cnt = cnt.drop(index=cnt.index[min_idx + 1])  # 删除被合并的行（组）
+    return cnt
 
 
 if __name__ == '__main__':
     df = pd.read_csv('tidy.data', names=['A', 'B', 'C', 'D', 'label'])[:100]
     cnt = dsct_init(df, list('ABCD'))
-    calculate_chi2(cnt, 1, 2)
+    chi2_list = [calculate_chi2(cnt, idx, idx + 1)
+                 for idx in range(len(cnt) - 1)]
+    cnt = merge_adjacent_interval(chi2_list, cnt)
