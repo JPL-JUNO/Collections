@@ -5,9 +5,12 @@
 @CreatedTime: 2023-07-01 20:03:36
 """
 from time import ctime
+import numpy as np
+from pandas import DataFrame
 import sys
 sys.path.append('./')
 sys.path.append('../')
+import pandas as pd
 
 
 def data_loading(file: str) -> list[list]:
@@ -86,8 +89,73 @@ def collect(instances, i):
 
 
 def combine(a, b):
-    pass
+    return (a[0], np.array(a[1]) + np.array(b[1]))
+
+
+# if __name__ == '__main__':
+#     data = data_loading('../ScoreCard2/tidy.data')
+#     print(combine(('4.4', [3, 1, 0]), ('4.5', [1, 0, 1])))
+
+
+def chi2(A):
+    m = len(A)
+    k = len(A[0])
+    R = []
+    for i in range(m):
+        sum = 0
+        for j in range(k):
+            sum += A[i][j]
+
+
+def dsct_init(data, feature_cols, target: str = 'label'):
+
+    numerical_cols = data.select_dtypes(include=['float', 'int']).columns
+    categorical_cols = data.select_dtypes(include=['object']).columns
+    numerical_cols = numerical_cols.drop(
+        target) if target in numerical_cols else numerical_cols
+    categorical_cols = categorical_cols.drop(
+        target) if target in categorical_cols else categorical_cols
+    data_type = data[feature_cols].dtypes.value_counts()
+    if True:
+        # 如果是连续变量
+        cnt = pd.crosstab(data[feature_cols[1]],
+                          data[target]).sort_index(ascending=True)
+        cnt['total'] = cnt.sum(axis=1)
+    else:
+        pass
+    return cnt
+
+
+def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int):
+    # 计算出四联表
+    # 因为最后一列是求和列，舍弃，只需要Aij
+    Aij = cnt.iloc[[bin1, bin2], :-1].values
+    Ri = Aij.sum(axis=1)
+    Cj = Aij.sum(axis=0)
+    Ri[Ri == 0] = .1
+    Cj[Cj == 0] = .1
+    Aij[Aij == 0] = .1
+    N = Aij.sum()
+    Eij = Ri.reshape(-1, 1) * Cj
+    Cj = Aij.sum(axis=0)
+    Cj[Cj == 0] = .1
+
+    contingency_table = np.vstack((Aij, Cj))
+    Eij = contingency_table[:, -1].reshape(-1, 1) * \
+        contingency_table[-1, :].reshape(1, -1) / contingency_table[-1, -1]
+    chi2 = ((Aij[:, :-1] - Eij[:-1, :-1]) ** 2 / Eij[:-1, :-1]).sum()
+    print(chi2)
+    print(Eij)
+    print(Eij[:-1, :-1])
+    Eij = Aij[:, -1].reshape(-1, 1) * Cj[:-1] / Cj[-1]
+    print(Eij)
+    print(Aij[:, :-1])
+    chi2 = ((Aij[:, :-1] - Eij)**2 / Eij).sum()
+    print(chi2)
+    return chi2
 
 
 if __name__ == '__main__':
-    data = data_loading('../ScoreCard2/tidy.data')
+    df = pd.read_csv('tidy.data', names=['A', 'B', 'C', 'D', 'label'])[:100]
+    cnt = dsct_init(df, list('ABCD'))
+    calculate_chi2(cnt, 1, 2)

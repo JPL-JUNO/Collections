@@ -8,6 +8,7 @@ import pandas as pd
 from pandas import DataFrame
 import inspect
 from collections import Counter
+from woe import woebin
 
 
 class DataWrangling:
@@ -56,3 +57,8 @@ class DataWrangling:
             print(
                 f'{100*self.na_stat[self.label]:.3f} % missing rate of target')
         print('')
+
+    def sample_woebin(self, ):
+        print('特征分箱')
+
+        bins = woebin(df=self.data, y=self.label, var_skip=var_skip)
