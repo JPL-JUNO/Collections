@@ -4,9 +4,11 @@
 @LastEditor(s): Stephen CUI
 @CreatedTime: 2023-07-01 20:03:36
 """
-from time import ctime
+from timeit import default_timer
 import numpy as np
 from pandas import DataFrame
+from collections import defaultdict
+from scipy.stats import chi2
 import sys
 sys.path.append('./')
 sys.path.append('../')
@@ -97,18 +99,18 @@ def combine(a, b):
 #     print(combine(('4.4', [3, 1, 0]), ('4.5', [1, 0, 1])))
 
 
-def chi2(A):
-    m = len(A)
-    k = len(A[0])
-    R = []
-    for i in range(m):
-        sum = 0
-        for j in range(k):
-            sum += A[i][j]
+# def chi2(A):
+#     m = len(A)
+#     k = len(A[0])
+#     R = []
+#     for i in range(m):
+#         sum = 0
+#         for j in range(k):
+#             sum += A[i][j]
 
 
-def dsct_init(data, feature_cols, target: str = 'label'):
-
+def dsct_init(data, feature_cols: list[str], target: str = 'label') -> defaultdict[list]:
+    bin_res = defaultdict(list)
     numerical_cols = data.select_dtypes(include=['float', 'int']).columns
     categorical_cols = data.select_dtypes(include=['object']).columns
     numerical_cols = numerical_cols.drop(
@@ -120,10 +122,11 @@ def dsct_init(data, feature_cols, target: str = 'label'):
         # 如果是连续变量
         cnt = pd.crosstab(data[feature_cols[1]],
                           data[target]).sort_index(ascending=True)
-        cnt['total'] = cnt.sum(axis=1)
+        # cnt['total'] = cnt.sum(axis=1)
     else:
         pass
-    return cnt
+
+    return bin_res
 
 
 def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int) -> float:
@@ -145,7 +148,7 @@ def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int) -> float:
     """
     # 计算出四联表
     # 因为最后一列是求和列，舍弃，只需要Aij
-    Aij = cnt.iloc[[bin1, bin2], :-1].values
+    Aij = cnt.iloc[[bin1, bin2], :].values
     Ri = Aij.sum(axis=1).astype(float)
     Cj = Aij.sum(axis=0).astype(float)
     Ri[Ri == 0] = .1
@@ -157,18 +160,89 @@ def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int) -> float:
     return chi2
 
 
-def merge_adjacent_interval(chi2_list: list, cnt: DataFrame) -> DataFrame:
+def merge_adjacent_interval(chi2_list: list,
+                            cnt: DataFrame) -> tuple[DataFrame, list]:
+    """依据chi2值合并最近的两组
 
-    min_chi2 = min(chi2_list)
-    # 找到最小最的索引所在位置，如果有多个直接一次性合并，而不是每次只找到最靠前的索引(弃用，因为如果存在连续的idx不好处理)
+    Parameters
+    ----------
+    chi2_list : list
+        表示相邻组的chi2值
+    cnt : DataFrame
+        用来提供chi2值的数据，即等待被合并的数据集
+
+    Returns
+    -------
+    tuple[DataFrame, list]
+        合并后的数据，已经合并后数据的新的chi2值列表
+    """
+    # min_chi2 = min(chi2_list)
+    # 找到最小最的索引所在位置，如果有多个直接一次性合并， 而不是每次只找到最靠前的索引(弃用，因为如果存在连续的idx不好处理)
     min_idx = chi2_list.index(min(chi2_list))
     # min_idx = [idx for idx in chi2_list if idx == min_chi2]
     # for idx in min_idx:
     #     cnt.iloc[idx] = cnt.iloc[idx] + cnt.iloc[idx + 1]
-    print(min_idx)
     cnt.iloc[min_idx] = cnt.iloc[min_idx] + cnt.iloc[min_idx + 1]
     cnt = cnt.drop(index=cnt.index[min_idx + 1])  # 删除被合并的行（组）
-    return cnt
+
+    # 这里的代码只做增量更新，不需要计算那些没有合并的组，尽在合并组附近两组内计算chi2
+    # if min_idx == 0:
+    #     chi2_unchanged = chi2_list[2:]
+    #     chi2_new = [calculate_chi2(cnt, 0, 1)]
+    #     chi2_list = chi2_new + chi2_unchanged
+    # elif min_idx == len(chi2_list) - 1:
+    #     chi2_unchanged = chi2_list[:-2]
+    #     chi2_new = [calculate_chi2(cnt, len(cnt) - 2, len(cnt) - 1)]
+    #     chi2_list = chi2_unchanged + chi2_new
+    # else:
+    #     chi2_unchanged_before = chi2_list[:min_idx - 1]
+    #     chi2_unchanged_after = chi2_list[min_idx + 2:]
+    #     chi2_new = [calculate_chi2(cnt, idx, idx + 1)
+    #                 for idx in range(min_idx - 1, min_idx + 1)]
+    #     chi2_list = chi2_unchanged_before + chi2_new + chi2_unchanged_after
+
+    # 在新的统计中从头计算合并相邻两组的chi2
+    chi2_list = [calculate_chi2(cnt, idx, idx + 1)
+                 for idx in range(len(cnt) - 1)]
+    return cnt, chi2_list
+
+
+def chi2_merge(cnt: DataFrame, sig_level: float = .05,
+               max_bins: int = 10) -> defaultdict[list]:
+    """实现chi2合并
+
+    Parameters
+    ----------
+    cnt : DataFrame
+        分组聚合后的数据
+    sig_level : float, optional
+        显著性水平 `1-significance`, by default .05
+    max_bins : int, optional
+        最大分箱数, by default 10
+
+    Returns
+    -------
+    tuple[DataFrame, list]
+        分箱后的数据集和对应的chi2值
+    """
+    start_time = default_timer()
+    # 自由度是classes - 1
+    degree_freedom = cnt.shape[1] - 1
+    chi2_threshold = chi2.ppf(1 - sig_level, degree_freedom)
+
+    chi2_list = [calculate_chi2(cnt, idx, idx + 1)
+                 for idx in range(len(cnt) - 1)]
+    while True:
+        if min(chi2_list) >= chi2_threshold:
+            print(
+                f'[提醒] 组间最小chi2值 {min(chi2_list):.3f} 大于卡方阈值 {chi2_threshold:.3f}')
+            break
+        if len(cnt) <= max_bins:
+            print(f'[提醒] 组的个数等于指定分箱数{max_bins}')
+            break
+        cnt, chi2_list = merge_adjacent_interval(chi2_list, cnt)
+    print(f'[信息] 分箱完成, 耗时{(default_timer()-start_time):.3f}s')
+    return cnt, chi2_list
 
 
 if __name__ == '__main__':
@@ -176,4 +250,4 @@ if __name__ == '__main__':
     cnt = dsct_init(df, list('ABCD'))
     chi2_list = [calculate_chi2(cnt, idx, idx + 1)
                  for idx in range(len(cnt) - 1)]
-    cnt = merge_adjacent_interval(chi2_list, cnt)
+    cnt, chi2_list = chi2_merge(cnt, max_bins=5)

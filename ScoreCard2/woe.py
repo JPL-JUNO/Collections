@@ -15,7 +15,17 @@ def woebin_tree(df):
     pass
 
 
-def woebin_chi2merge(df: DataFrame):
+def woebin_chi2merge(df: DataFrame, stop_limit: float = .1):
+    def add_chisq(initial_binning):
+        pass
+    bin_list = woebin2_init_bin()
+    initial_binning = bin_list['initial_binning']
+    binning_sv = bin_list['binning_sv']
+    if len(initial_binning.index) == 1:
+        return {'bining_sv': binning_sv, 'binning': initial_binning}
+    df_rows = len(df)
+    from scipy.special import chdtri
+    chisq_limit = chdtri(1, stop_limit)
     pass
 
 
