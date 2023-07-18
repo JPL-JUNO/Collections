@@ -7,6 +7,7 @@
 from timeit import default_timer
 import numpy as np
 from pandas import DataFrame
+from collections import defaultdict
 from scipy.stats import chi2
 import sys
 sys.path.append('./')
@@ -108,8 +109,8 @@ def combine(a, b):
 #             sum += A[i][j]
 
 
-def dsct_init(data, feature_cols, target: str = 'label'):
-
+def dsct_init(data, feature_cols: list[str], target: str = 'label') -> defaultdict[list]:
+    bin_res = defaultdict(list)
     numerical_cols = data.select_dtypes(include=['float', 'int']).columns
     categorical_cols = data.select_dtypes(include=['object']).columns
     numerical_cols = numerical_cols.drop(
@@ -124,7 +125,8 @@ def dsct_init(data, feature_cols, target: str = 'label'):
         # cnt['total'] = cnt.sum(axis=1)
     else:
         pass
-    return cnt
+
+    return bin_res
 
 
 def calculate_chi2(cnt: DataFrame, bin1: int, bin2: int) -> float:
@@ -206,7 +208,7 @@ def merge_adjacent_interval(chi2_list: list,
 
 
 def chi2_merge(cnt: DataFrame, sig_level: float = .05,
-               max_bins: int = 10) -> tuple[DataFrame, list]:
+               max_bins: int = 10) -> defaultdict[list]:
     """实现chi2合并
 
     Parameters
