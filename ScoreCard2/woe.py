@@ -9,6 +9,8 @@ from timeit import default_timer
 from typing import TypeAlias
 from collections import defaultdict
 numerical: TypeAlias = float | int
+import numpy as np
+from pandas.api.types import is_numeric_dtype
 
 
 def woebin_tree(df):
@@ -26,7 +28,77 @@ def woebin_chi2merge(df: DataFrame, stop_limit: float = .1):
     df_rows = len(df)
     from scipy.special import chdtri
     chisq_limit = chdtri(1, stop_limit)
+    binning_chisq = add_chisq(initial_binning)
+
     pass
+
+
+def woebin2_init_bin(dtm, init_cnt_distr, breaks, spl_val):
+    dtm, binning_sv = dtm_binning_sv(dtm, breaks, spl_val)
+    if dtm is None:
+        return binning_sv, None
+    if is_numeric_dtype(dtm['value']):
+        xvalue = dtm['value'].astype(float)
+        iq = xvalue.quantile([.01, .25, .75, .99])
+        iqr = iq.loc[.75] - iq.loc[.25]
+        if iqr == 0:
+            prob_down = .01
+            prob_up = .99
+        else:
+            prob_down = .25
+            prob_up = .75
+        xvalue_rm_outlier = xvalue[(
+            xvalue >= iq.loc[prob_down] - 3 * iqr) & (xvalue <= iq[prob_up] + 3 * iqr)]
+        n = np.trunc(1 / init_cnt_distr)
+        len_uniq_x = len(np.unique(xvalue_rm_outlier))
+        if len_uniq_x < n:
+            n = len_uniq_x
+        brk = np.unique(xvalue_rm_outlier) if len_uniq_x < 10 else pretty(
+            min(xvalue_rm_outlier), max(xvalue_rm_outlier), n)
+        brk = list(filter(lambda x: x > np.nanmin(
+            xvalue) and x <= np.nanmax(xvalue), brk))
+    pass
+
+
+def pretty():
+    pass
+
+
+def split_vec_todf():
+    pass
+
+
+def dtm_binning_sv(dtm, breaks, spl_val) -> tuple:
+    # spl_val = add_missing_spl_val(dtm, breaks, spl_val)
+    if spl_val is not None:
+        sv_df = split_vec_todf(spl_val)
+        if is_numeric_dtype(dtm['value']):
+            sv_df['value'] = sv_df['value'].astype(dtm['value'].dtypes)
+            sv_df['bin_chr'] = np.where(np.isnan(
+                sv_df['value']), sv_df['bin_chr'], sv_df['value'].astype(dtm['value'].dtypes).astype(str))
+        dtm_sv = pd.merge(dtm.fillna('missing'), sv_df[['value']].fillna(
+            'missing'), how='inner', on='value', right_index=True)
+        # 将原本的dtm分为两个新的dataframe
+        # dtm_sv 包含所有的 spl_val
+        # dtm 剔除所有的 spl_val
+        dtm = dtm[~dtm.index.isin(dtm_sv.index)].reset_index() if len(
+            dtm_sv) < len(dtm) else None
+        if dtm_sv.shape[0] == 0:
+            return {'binning_sv': None, 'dtm': dtm}
+        binning_sv = pd.merge(dtm_sv.fillna('missing').groupby(
+            ['variable', 'value'])['y'].agg([n0, n1]).reset_index().rename(columns={'n0': 'good', 'n1': 'bad'}),
+            sv_df.fillna('missing'), on='value').groupby(['variable', 'rowid', 'bin_chr']).agg({'bad': sum, 'good': sum}).reset_index().rename(columns={'bin_chr': 'bin'}).drop('rowid', axis=1)
+    else:
+        binning_sv = None
+    return dtm, binning_sv
+
+
+def n0(x):
+    return sum(x == 'Iris-setosa')
+
+
+def n1(x):
+    return sum(x == 'Iris-virginica')
 
 
 def woebin2_breaks():
@@ -81,8 +153,10 @@ def woebin(df: DataFrame, y: str = 'label', x=None,
 
 
 if __name__ == '__main__':
+    # import pandas as pd
+    # df = pd.read_csv('tidy.data', names=['a', 'b', 'c', 'd', 'label'])
+    # iv = pd.Interval(left=0, right=.5, closed='both')
+    # assert .3 in iv, 'add'
+    # woebin(df)
     import pandas as pd
-    df = pd.read_csv('tidy.data', names=['a', 'b', 'c', 'd', 'label'])
-    iv = pd.Interval(left=0, right=.5, closed='both')
-    assert .3 in iv, 'add'
-    woebin(df)
+    df = pd.read_csv('tidy.data', names=['A', 'B', 'C', 'D', 'label'])
