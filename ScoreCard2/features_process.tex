@@ -8,7 +8,7 @@
 
 \begin{table}
     \centering
-    \caption{两个区间、两个类的$\chi^2$合并示意图}
+    \caption{两个区间、两个类的 $\chi^2$ 合并示意图}
     \begin{tabular}{rrrr}
         \hline
               & $y_0$      & $y_1$      & 合计          \\
@@ -39,4 +39,41 @@
         \end{bmatrix}=\frac{1}{N}\bm{R}\bm{J}
     \end{aligned}
 \end{equation}
-这样代码中可以直接使用广播机制来计算$E_{ij}$
+这样代码中可以直接使用广播机制来计算 $E_{ij}$。
+\subsection{增量更新$\chi^2$}
+如果分组特别的多，每次都对相邻的组做 $\chi^2$ 的计算，会耗费计算资源，可以考虑只用增量更新的方法来更新 $\chi^2$ 列表，\autoref{increment update}。
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
+\begin{table}
+    \centering
+    \caption{增量更新 $\chi^2$ 列表}
+    \label{increment update}
+    \begin{tabular}{rrrr}
+        \hline
+        原分组  & $\chi^2$                     & 一次合并后   & 合并后$\chi^2$                     \\
+        \hline
+        1.1  & \cellcolor[HTML]{8EA9DB}0.1  & 1.1     & \cellcolor[HTML]{8EA9DB}0.1     \\
+        2.2  & \cellcolor[HTML]{8EA9DB}0.3  & 2.2     & \cellcolor[HTML]{8EA9DB}0.3     \\
+        3.2  & 0.4                          & 3.2     & \cellcolor[HTML]{FFC000}changed \\
+        3.5  & 0.0                          & 3.5,3.7 & \cellcolor[HTML]{FFC000}changed \\
+        3.7  & 0.4                          & 5.5     & \cellcolor[HTML]{8EA9DB}0.6     \\
+        5.5  & \cellcolor[HTML]{8EA9DB}0.6  & 6.7     & \cellcolor[HTML]{8EA9DB}0.12    \\
+        6.7  & \cellcolor[HTML]{8EA9DB}0.12 & 7.1     & \cellcolor[HTML]{8EA9DB}0.11    \\
+        7.1  & \cellcolor[HTML]{8EA9DB}0.11 & 7.8     & \cellcolor[HTML]{8EA9DB}0.12    \\
+        7.8  & \cellcolor[HTML]{8EA9DB}0.12 & 7.9     & \cellcolor[HTML]{8EA9DB}0.16    \\
+        7.9  & \cellcolor[HTML]{8EA9DB}0.16 & 10.0    &                                 \\
+        10.0 &                              &         &                                 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{停止条件}
+卡方分箱的停止条件有如下两种选择：
+\begin{enumerate}
+    \item 分箱个数等于指定的分箱数目（\verb|max_bins|）：限制最终的分箱个数结果，每次将样本中具有最小卡方值的区间与相邻的最小卡方区间进行合并，直到分箱个数达到限制条件为止。
+    \item 最小卡方值大于卡方阈值（\verb|chi2_threshold|）：根据自由度和显著性水平得到对应的卡方阈值，如果分箱的各区间最小卡方值小于卡方阈值，则继续合并，直到最小卡方值超过设定阈值为止。
+\end{enumerate}
+可以两个同时用，也可以只用一个。看实际需求调整即可。
+\subsubsection*{阈值的意义}
+类别和属性独立时,有 90\% 的可能性,计算得到的卡方值会小于 4.6。 大于阈值 4.6 的卡方值就说明属性和类不是相互独立的，不能合并。如果阈值选的大,区间合并就会进行很多次，离散后的区间数量少、区间大。
