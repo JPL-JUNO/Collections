@@ -10,27 +10,52 @@ from typing import TypeAlias
 from collections import defaultdict
 numerical: TypeAlias = float | int
 import numpy as np
+from numpy import ndarray
 from pandas.api.types import is_numeric_dtype
+from scipy.special import chdtri
 
 
 def woebin_tree(df):
     pass
 
 
-def woebin_chi2merge(df: DataFrame, stop_limit: float = .1):
+def woebin_chi2merge(dtm: DataFrame, init_cnt_distr: float = .02, cnt_distr_limit: float = .05,
+                     stop_limit: float = .1, breaks=None, spl_val=None):
     def add_chisq(initial_binning):
+        # 添加一列chi2值
         pass
-    bin_list = woebin2_init_bin()
-    initial_binning = bin_list['initial_binning']
-    binning_sv = bin_list['binning_sv']
+    initial_binning, binning_sv = woebin2_init_bin(
+        dtm, init_cnt_distr=init_cnt_distr, breaks=breaks, spl_val=spl_val)
+
     if len(initial_binning.index) == 1:
         return {'bining_sv': binning_sv, 'binning': initial_binning}
-    df_rows = len(df)
-    from scipy.special import chdtri
+    dtm_rows = len(dtm)
+
     chisq_limit = chdtri(1, stop_limit)
     binning_chisq = add_chisq(initial_binning)
-
-    pass
+    bin_chisq_min = binning_chisq['chisq'].min()
+    bin_cnt_distr_min = min(binning_chisq['count'] / dtm_rows)
+    bin_nrow = len(binning_chisq)
+    while True:
+        if bin_chisq_min < chisq_limit:
+            rm_brkp = binning_chisq.assign(merge_tolead=False).sort_values(
+                by=['chisq', 'count']).iloc[0,]
+        if bin_cnt_distr_min < cnt_distr_limit:
+            rm_brkp = binning_chisq.assign(
+                count_distr=lambda x: x['count'] / sum(x['count']),
+                chisq_lead=lambda x: x['chisq'].shift(-1).fillna(float('int'))).assign(merge_tolead=lambda x: x['chisq'] > x['chisq_lead'])
+            rm_brkp.loc[np.isnan(rm_brkp['chisq']), 'merge_tolead'] = True
+            rm_brkp = rm_brkp.sort_values(by=['count_distr']).iloc[0,]
+        if bin_nrow > bin_num_limit:
+            rm_brkp = binning_chisq.assign(merge_tolead=False).sort_values(
+                by=['chisq', 'count']).iloc[0,]
+        binning_chisq = add_chisq(binning_chisq)
+        bin_nrow = len(binning_chisq)
+        if bin_nrow == 1:
+            break
+        # if is_numeric_dtype(dtm['value']):
+        #     binning_chisq = binning_chisq.assign(bin=lambda x: )
+    return binning_sv, binning_chisq
 
 
 def woebin2_init_bin(dtm, init_cnt_distr, breaks, spl_val):
@@ -57,11 +82,45 @@ def woebin2_init_bin(dtm, init_cnt_distr, breaks, spl_val):
             min(xvalue_rm_outlier), max(xvalue_rm_outlier), n)
         brk = list(filter(lambda x: x > np.nanmin(
             xvalue) and x <= np.nanmax(xvalue), brk))
-    pass
+
+        initial_binning = dtm.groupby('bin')['y'].agg([n0, n1]).reset_index()
+    return initial_binning, binning_sv
 
 
-def pretty():
-    pass
+def pretty(low: numerical, high: numerical, n: int) -> ndarray:
+    """实现`pretty`的区间分割，与R中`pretty`函数相同，生成的序列最大值大于等于`high`，最小值小于等于`low`，间隔是10^t的1倍、2倍、5倍
+
+    Parameters
+    ----------
+    low : numerical
+        指定的序列下界
+    high : numerical
+        指定范围的上界
+    n : int
+        生成序列的个数，实际生成的个数会大于`n`
+
+    Returns
+    -------
+    ndarray
+        均匀的序列，范围大于`(low, high)`
+    """
+    # 在分箱初始化中，可能会使用，生成初始的分箱区间
+    def nice_number(x):
+        exp = np.trunc(np.log10(abs(x)))
+        f = abs(x) / 10 ** exp
+        if f < 1.5:
+            nf = 1.
+        elif f < 3.5:
+            nf = 2.
+        elif f < 7.5:
+            nf = 5.
+        else:
+            nf = 10.
+        return np.sign(x) * nf * 10.0 ** exp
+    d = abs(nice_number((high - low) / (n - 1)))
+    min_y = np.floor(low / d) * d
+    max_y = np.ceil(high / d) * d
+    return np.arange(min_y, max_y + 1, d)
 
 
 def split_vec_todf():
@@ -147,7 +206,7 @@ def woebin(df: DataFrame, y: str = 'label', x=None,
             if method == 'tree':
                 bin_list = woebin_tree()
             else:
-                bin_list = woebin_chi2merge()
+                bin_list = woebin_chi2merge(df)
     end_time = default_timer()
     print(f'[信息] 运行时间：{(end_time-start_time):.4f}s')
 

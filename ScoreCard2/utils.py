@@ -8,6 +8,7 @@
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
+from typing import TypeAlias
 
 
 def calculate_woe(df: DataFrame, label: str = 'label') -> DataFrame:
@@ -64,7 +65,18 @@ def filter_by_diversity(data, diversity: float = .95, label: str = 'label'):
     pass
 
 
+list_check: TypeAlias = list | None
+
+
+def list_type_check(variable: list):
+    if not isinstance(variable, list_check):
+        raise TypeError('variable must be a list or None')
+
+
 if __name__ == "__main__":
-    df = pd.read_csv('bank.csv', sep=';')
-    df['y'] = df['y'].map({'no': 0, 'yes': 1})
-    print(filter_by_iv(df, label='y'))
+    # df = pd.read_csv('bank.csv', sep=';')
+    # df['y'] = df['y'].map({'no': 0, 'yes': 1})
+    # print(filter_by_iv(df, label='y'))
+    list_type_check(list('aabb'))
+    list_type_check(None)
+    list_type_check('aabb')

@@ -7,7 +7,12 @@
 
 import pandas as pd
 from data_wrangling import DataWrangling
+from handling import FeatureSelector
 from pandas import DataFrame
+from sklearn.linear_model import LogisticRegression
+from collections import defaultdict
+from typing import TypeAlias
+list_check: TypeAlias = list | None
 
 
 class SCModel(DataWrangling):
@@ -15,7 +20,7 @@ class SCModel(DataWrangling):
                  filename: str,
                  extend: str = 'csv',
                  label: str = 'label',
-                 specified_cols: list | None = None):
+                 specified_cols: list_check = None):
         self.filename = filename
         self.extend = extend
         self.label = label
@@ -34,3 +39,94 @@ class SCModel(DataWrangling):
         self.feature_dtypes(self.data)
 
         self.missing_value_check(self.data)
+
+    def pro_feature_process(self, iv_threshold: float = .15,
+                            max_feature: int = 6,
+                            corr_threshold: float = .6,
+                            cum_importance: float = .95,
+                            break_adj=None,
+                            var_rm: list = None, var_kp=None):
+        if not isinstance(var_rm, list_check):
+            raise TypeError('var_rm should be a list or None')
+
+        if not isinstance(var_kp, list_check):
+            raise TypeError('var_kp should be a list or None')
+        if not isinstance(self.specified_cols, list_check):
+            raise TypeError('use_specified_var should be a list or None')
+        if self.specified_cols is not None:
+            print('[信息] 使用指定的特征建模...')
+            self.data = self.data[[self.label] + self.specified_cols]
+        else:
+            self.bins0 = self.sample_woebin(break_list=break_adj,
+                                            set_default_bin=False,
+                                            no_cores=1)
+            self.filter_feature_iv(
+                self.bins0, iv=iv_threshold, remove=True, re=False)
+            self.check_feature_importances(self.bins0, n_estimators=100,
+                                           max_features=max_feature,
+                                           max_depth=3)
+            self.plot_feature_importances()
+            selector = FeatureSelector(
+                data=self.data, labels=self.data[self.label])
+            # selector.identify_collinear(corr_threshold=.6)
+            selector.identify_collinear(corr_threshold=corr_threshold)
+            selector.plot_collinear(plot_all=True)
+            self.corr_matrix = selector.corr_matrix
+
+            self.check_corr_matrix_control(threshold=corr_threshold, remove=True,
+                                           re=False, method='feature_importance')
+            self.renew()
+            self.check_feature_importances(self.bins0, n_estimators=100,
+                                           max_features=max_feature, max_depth=3)
+            self.plot_feature_importances()
+
+            self.filter_feature_importances(cum=cum_importance,
+                                            method='cum')
+            self.renew()
+        self.sample_woebin(break_list=break_adj,
+                           set_default_bin=True, re=False, no_cores=1)
+
+        pass
+
+    def pro_sampling(self):
+        self.sample_split(ratio=.7, seed=123)
+        self.sample_woe_ply(self.bins)
+
+    def pro_modeling(self, penalty='l2',
+                     C=1, solver: str = 'lbfgs',
+                     n_jobs: int = -1):
+        self.model = LogisticRegression(penalty=penalty,
+                                        C=C,
+                                        solver=solver, n_jobs=n_jobs)
+        self.model.fit(self.X_train, self.y_train)
+        self.train_pred = self.model.predict_proba(self.X_train)[:, 1]
+        self.test_pred = self.model.predict_proba(self.X_test)[:, 1]
+
+    def pro_evaluation(self):
+        self.train_perf = perf_eva(
+            self.y_train, self.train_pred, title='train')
+        self.test_perf = perf_eva(self.y_test, self.test_pred, title='test')
+        self.model_scorecard()
+        self.train_score = self.model_scorecard_ply(self.train, self.card)
+        self.test_score = self.model_scorecard_ply(self.test, self.card)
+
+        self.psi = perf_psi(score={'train': self.train_score, 'test': self.test_score},
+                            label={'train': self.y_train, 'test': self.y_test},
+                            return_distr_dat=True, figsize=(11, 6), show_plot=self.show_plot)
+
+    def pro_development(self, save=True, route='./temp/source', name='output'):
+        self.output = defaultdict(dict)
+        self.output['KS']['train'] = self.train_perf['KS']
+        self.output['KS']['test'] = self.test_perf['test']
+        self.output['AUC']['train'] = self.train_perf['AUC']
+        self.output['AUC']['test'] = self.test_perf['test']
+
+        print(f"Train set eva: KS = {self.output['KS']['train']}")
+        print(f"Test set eva: KS = {self.output['KS']['test']}")
+        print(f"Train set eva: AUC = {self.output['AUC']['train']}")
+        print(f"Test set eva: AUC = {self.output['AUC']['test']}")
+        self.output['psi'] = self.psi['dat']['score']
+        self.output['epc'] = self.epo
+        self.output['card'] = self.model_card_save()
+        if getattr(self, 'bins0', None) is not None:
+            pass

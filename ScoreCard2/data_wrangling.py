@@ -15,6 +15,7 @@ class DataWrangling:
     def __init__(self, label: str = 'label'):
         self.processing_step = 1
         self.label = label
+        self.corr_matrix = None
 
     def __hint_info_print(self, info: str) -> None:
         s = inspect.stack()[1][3]
@@ -58,7 +59,24 @@ class DataWrangling:
                 f'{100*self.na_stat[self.label]:.3f} % missing rate of target')
         print('')
 
-    def sample_woebin(self, ):
+    def sample_woebin(self, break_list,
+                      set_default_bin: bool,
+                      no_cores: int = 1):
         print('特征分箱')
 
         bins = woebin(df=self.data, y=self.label, var_skip=var_skip)
+
+    def check_corr_matrix_control():
+        pass
+
+    def plot_feature_importances():
+        pass
+
+    def check_feature_importances():
+        pass
+
+    def filter_feature_iv():
+        pass
+
+    def filter_feature_importances():
+        pass
