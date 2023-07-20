@@ -130,3 +130,51 @@ class SCModel(DataWrangling):
         self.output['card'] = self.model_card_save()
         if getattr(self, 'bins0', None) is not None:
             pass
+
+        # ls = list(self.bins.values())
+        bins_tem = pd.DataFrame(self.bins.values()).reset_index(
+            drop=True).sort_values(by=['total_iv', 'variable'], ascending=[False, True])
+        bins_tem_coef = pd.DataFrame(
+            {'variable': [i.replace('_woe', '') for i in self.X_train.columns],
+             'coef': list(self.model.coef_[0]),
+             'VIF': [variance_inflation_factor(self.X_train.values, i) for i in range(self.X_train.shape[1])]})
+        bins_tem = bins_tem.merge(bins_tem_coef, on='variable', how='left')
+        id0 = list()
+        for i in bins_tem['variable']:
+            if i in vb_code.keys():
+                id0.append(vb_code[i])
+            else:
+                id0.append(i)
+        bins_tem['name'] = id0
+        bins_tem = bins_tem[['variable', 'name', 'bin', 'count', 'count_distr', 'good',
+                             'bad', 'bardprob', 'woe', 'bin_iv', 'total_iv', 'coef', 'VIF']]
+        self.output['bins'] = bins_tem
+        if save:
+            variable_dum(self.output, route=route, name=name)
+        xlsx_save = xlsxwriter(filename='output')
+        for k, v in self.output.items():
+            if isinstance(v, DataFrame):
+                if k in ('binsall', 'bins'):
+                    comment = ['FEATURE PROJECT BIN', 'WOE']
+                    conditional_format = ['count_distr', 'badprob']
+                elif k in ('card'):
+                    comment = None
+                    conditional_format = ['points']
+                elif k in ('epo', 'psi'):
+                    comment = None
+                    conditional_format = None
+                else:
+                    comment = None
+                    conditional_format = None
+                xlsx_save.write(data[v],
+                                sheet_name=k, startrow=2, startcol=2, index=0,
+                                conditional_format=conditional_format, comment=comment)
+
+        xlsx_save.save()
+        chartbin = xlsxwriter(filename='chart_bins')
+        chartbin.chart_woebin(self.output['binsall'],
+                              vb_code,
+                              series_name={'good': '负样本',
+                                           'bad': '正样本',
+                                           'badprop': '正样本占比'})
+        chartbin.save()
