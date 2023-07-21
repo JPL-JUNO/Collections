@@ -16,9 +16,11 @@ class ScoreCard(DataWrangle):
                  data: DataFrame = None,
                  target: str = 'label',
                  remove_features: list_check = None):
-        DataWrangle.__init__(self, data=data, target=target)
+
+        print(data.head())
         self.data = data
         self.target = target
+        print(data.columns)
         assert target in self.data.columns, 'label not in data columns'
         # 所有字段名全部转化为小写
         self.data.columns = self.data.columns.str.replace(' ', '_').str.lower()
@@ -32,6 +34,7 @@ class ScoreCard(DataWrangle):
         self.category_features = self.features[self.features_data.dtypes == 'object']
         self.numerical_features = self.features_data.select_dtypes(
             include='number').columns
+        DataWrangle.__init__(self, data=data, target=target)
 
         # assert isinstance(
         #     remove_features, list_check), 'remove_features should be a list or None'
@@ -41,12 +44,14 @@ class ScoreCard(DataWrangle):
         #         assert feature.lower() in self.features, 'specified removed feature not in data features'
         # print(self.features)
 
-    def data_insight(self):
-        self.update_metadata()
+    def data_insight(self, fillna: dict = None,
+                     drop_target_na: bool = True):
+        # self.update_metadata()
         # 数据查看
-        self.check_y_distribution()
-        # self.check_features_type()
-        # self.check_uni_characters()
+        self.check_y_distribution(drop_target_na)
+        self.check_features_type()
+        self.check_uni_characters(uni='-')
+        self.check_na(fillna=fillna)
         pass
 
     def data_cleaning(self):
@@ -57,5 +62,3 @@ if __name__ == '__main__':
     data = pd.read_csv('WA_Fn-UseC_-Telco-Customer-Churn.csv')
     sc = ScoreCard(data, 'Churn')
     sc.data_insight()
-    print(sc.category_features)
-    print(sc.numerical_features)
